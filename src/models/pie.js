@@ -21,7 +21,10 @@ nv.models.pie = function() {
         , labelThreshold = .02 //if slice percentage is under this, don't show label
         , donut = false
         , title = false
+        , titleValue = false
+        //, titleGetter = function(d){  d = d.data || d; return getX(d); }
         , growOnHover = true
+        , selectOnHover = false
         , titleOffset = 0
         , labelSunbeamLayout = false
         , startAngle = false
@@ -108,18 +111,63 @@ nv.models.pie = function() {
             // if title is specified and donut, put it in the middle
             if (donut && title) {
                 var title_g = g_pie.append('g').attr('class', 'nv-pie');
+                var val_offset = 0;
+                if(titleValue){
+                    val_offset = 0.5;
+                }
 
-                title_g.append("text")
+                var pieTitle = title_g.append("text")
                     .style("text-anchor", "middle")
                     .attr('class', 'nv-pie-title')
                     .text(function (d) {
+                        if(typeof title == "function")
+                            return d && title(d) || "";
+                            
                         return title;
                     })
-                    .attr("dy", "0.35em") // trick to vertically center text
+                    .attr("dy", (0.35 - val_offset) + "em") // trick to vertically center text
                     .attr('transform', function(d, i) {
-                        return 'translate(0, '+ titleOffset + ')';
+                        return 'translate(0, '+ titleOffset  + ')';
                     });
+
+                if(titleValue){
+                    title_g.append("text")
+                    .style("text-anchor", "middle")
+                    .attr('class', 'nv-pie-title nv-pie-value')
+                    .text(function (d) {
+                        if(typeof titleValue == "function")
+                            return d && titleValue(d) || "";
+
+                        return titleValue;
+                    })
+                    .attr("dy", "1.1em") // trick to vertically center text
+                    .attr('transform', function(d, i) {
+                        return 'translate(0, '+ titleOffset  + ')';
+                    });
+                }
             }
+
+            var setTitle = function(d){
+                if(!title || !donut)return;
+                var pieTitle = title;
+                if(typeof title == "function"){
+                    pieTitle = d && title(d) || "";
+                }
+                g_pie.select('.nv-pie-title:not(.nv-pie-value)')
+                 .text(pieTitle);
+                 
+                
+                //Set "Title Value" if is activated
+                if(titleValue){
+                    var pieValue = titleValue;
+                    if(typeof titleValue == "function"){
+                        pieValue = d && titleValue(d) || "";
+                    }
+                    g_pie.select('.nv-pie-title.nv-pie-value').text(pieValue);
+                }
+                //wrap the text
+                g_pie.selectAll('.nv-pie-title').call(nv.utils.wrapText,Math.round(radius*donutRatio)*Math.sqrt(2),true,true);
+            };
 
             var slices = wrap.select('.nv-pie').selectAll('.nv-slice').data(pie);
             var pieLabels = wrap.select('.nv-pieLabels').selectAll('.nv-label').data(pie);
@@ -130,8 +178,21 @@ nv.models.pie = function() {
             var ae = slices.enter().append('g')
             ae.attr('class', 'nv-slice')
             ae.on('mouseover', function(d,i){
+                ae.classed('hover', false);
+
+                if(selectOnHover){
+                    ae.select("path").transition()
+                        .duration(50)
+                        .attr("d", arc);
+
+                    if(title){
+                        setTitle(d);
+                    }
+                }
+
                 d3.select(this).classed('hover', true);
-                if (growOnHover) {
+
+                if (growOnHover || selectOnHover) {
                     d3.select(this).select("path").transition()
                         .duration(70)
                         .attr("d", arcOver);
@@ -148,7 +209,7 @@ nv.models.pie = function() {
             });
             ae.on('mouseout', function(d,i){
                 d3.select(this).classed('hover', false);
-                if (growOnHover) {
+                if (growOnHover && !selectOnHover) {
                     d3.select(this).select("path").transition()
                         .duration(50)
                         .attr("d", arc);
@@ -287,7 +348,8 @@ nv.models.pie = function() {
                         var labelTypes = {
                             "key" : getX(d.data),
                             "value": getY(d.data),
-                            "percent": labelFormat(percent)
+                            "percent": labelFormat(percent),
+                            "combined": getX(d.data) + " (" + getY(d.data) + ")"
                         };
                         return (d.value && percent > labelThreshold) ? labelTypes[labelType] : '';
                     })
@@ -330,6 +392,7 @@ nv.models.pie = function() {
         height:     {get: function(){return height;}, set: function(_){height=_;}},
         showLabels: {get: function(){return showLabels;}, set: function(_){showLabels=_;}},
         title:      {get: function(){return title;}, set: function(_){title=_;}},
+        titleValue: {get: function(){return titleValue;}, set: function(_){titleValue=_;}},
         titleOffset:    {get: function(){return titleOffset;}, set: function(_){titleOffset=_;}},
         labelThreshold: {get: function(){return labelThreshold;}, set: function(_){labelThreshold=_;}},
         labelFormat:    {get: function(){return labelFormat;}, set: function(_){labelFormat=_;}},
@@ -346,6 +409,7 @@ nv.models.pie = function() {
         labelSunbeamLayout: {get: function(){return labelSunbeamLayout;}, set: function(_){labelSunbeamLayout=_;}},
         donut:              {get: function(){return donut;}, set: function(_){donut=_;}},
         growOnHover:        {get: function(){return growOnHover;}, set: function(_){growOnHover=_;}},
+        selectOnHover:      {get: function(){return selectOnHover;}, set: function(_){selectOnHover=_;}},
 
         // options that require extra logic in the setter
         margin: {get: function(){return margin;}, set: function(_){

@@ -558,3 +558,60 @@ Runs common initialize code on the svg before the chart builds
 nv.utils.initSVG = function(svg) {
     svg.classed({'nvd3-svg':true});
 };
+
+/*
+    Wrap long text within a given width
+*/
+
+nv.utils.wrapText = function(text, width, centerVertical, together) {
+    var TotalLines = 0;
+    var lineHeight = 1.1; // ems
+  text.each(function() {
+    var text = d3.select(this),
+        words = text.text().split(/\s+/).reverse(),
+        word,
+        line = [],
+        lineNumber = 0,
+        y = text.attr("y"),
+        dy = parseFloat(text.attr("dy")) || 0,
+        tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+    while (word = words.pop()) {
+      line.push(word);
+      tspan.text(line.join(" "));
+      if (tspan.node().getComputedTextLength() > width) {
+        line.pop();
+        if(line.length > 0){
+            tspan.text(line.join(" "));
+            line = [word];
+            tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", (++lineNumber && 1 || 0) * lineHeight + dy + "em").text(word);
+        }
+      }
+    }
+
+    TotalLines += text.selectAll('tspan').size();
+    if(centerVertical && !together){
+        var numberOfLines = text.selectAll('tspan').size();
+        if(numberOfLines > 1){
+            var span =  text.select('tspan');
+            var dy = parseFloat(span.attr('dy'));
+            span.attr('dy',dy-(0.325*(numberOfLines-1)) + "em" );
+        }
+    }
+  });
+    
+    if(centerVertical && together){
+        var nextOffset = 0;
+        text.each(function(d,i){
+            var text = d3.select(this);
+            var span = text.select('tspan');
+            if( i == 0){
+                var dy = parseFloat(span.attr('dy'));
+                span.attr('dy',dy-(0.325*(TotalLines-1)) + "em" );
+            }else{
+                span.attr('dy', (nextOffset || lineHeight)+ "em" );
+            }
+
+            nextOffset = (text.selectAll('tspan').size()-1)*lineHeight;
+        });
+    }
+};
