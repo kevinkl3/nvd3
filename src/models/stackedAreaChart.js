@@ -31,10 +31,9 @@ nv.models.stackedAreaChart = function() {
         }
         , x //can be accessed via chart.xScale()
         , y //can be accessed via chart.yScale()
-        , yAxisTickFormat = d3.format(',.2f')
         , state = nv.utils.state()
         , defaultState = null
-        , noData = 'No Data Available.'
+        , noData = null
         , dispatch = d3.dispatch('tooltipShow', 'tooltipHide', 'stateChange', 'changeState','renderEnd')
         , controlWidth = 250
         , cData = ['Stacked','Stream','Expanded']
@@ -46,6 +45,7 @@ nv.models.stackedAreaChart = function() {
     xAxis.orient('bottom').tickPadding(7);
     yAxis.orient((rightAlignYAxis) ? 'right' : 'left');
 
+    var oldYTickFormat = null;
     controls.updateState(false);
 
     //============================================================
@@ -96,10 +96,8 @@ nv.models.stackedAreaChart = function() {
                 that = this;
             nv.utils.initSVG(container);
 
-            var availableWidth = (width  || parseInt(container.style('width')) || 960)
-                    - margin.left - margin.right,
-                availableHeight = (height || parseInt(container.style('height')) || 400)
-                    - margin.top - margin.bottom;
+            var availableWidth = nv.utils.availableWidth(width, container, margin),
+                availableHeight = nv.utils.availableHeight(height, container, margin);
 
             chart.update = function() { container.transition().duration(duration).call(chart); };
             chart.container = this;
@@ -125,18 +123,7 @@ nv.models.stackedAreaChart = function() {
 
             // Display No Data message if there's nothing to show.
             if (!data || !data.length || !data.filter(function(d) { return d.values.length }).length) {
-                var noDataText = container.selectAll('.nv-noData').data([noData]);
-
-                noDataText.enter().append('text')
-                    .attr('class', 'nvd3 nv-noData')
-                    .attr('dy', '-.7em')
-                    .style('text-anchor', 'middle');
-
-                noDataText
-                    .attr('x', margin.left + availableWidth / 2)
-                    .attr('y', margin.top + availableHeight / 2)
-                    .text(function(d) { return d });
-
+                nv.utils.noData(chart, container)
                 return chart;
             } else {
                 container.selectAll('.nv-noData').remove();
@@ -170,8 +157,7 @@ nv.models.stackedAreaChart = function() {
 
                 if ( margin.top != legend.height()) {
                     margin.top = legend.height();
-                    availableHeight = (height || parseInt(container.style('height')) || 400)
-                        - margin.top - margin.bottom;
+                    availableHeight = nv.utils.availableHeight(height, container, margin);
                 }
 
                 g.select('.nv-legendWrap')
@@ -222,8 +208,7 @@ nv.models.stackedAreaChart = function() {
 
                 if ( margin.top != Math.max(controls.height(), legend.height()) ) {
                     margin.top = Math.max(controls.height(), legend.height());
-                    availableHeight = (height || parseInt(container.style('height')) || 400)
-                        - margin.top - margin.bottom;
+                    availableHeight = nv.utils.availableHeight(height, container, margin);
                 }
 
                 g.select('.nv-controlsWrap')
@@ -274,9 +259,16 @@ nv.models.stackedAreaChart = function() {
             if (showYAxis) {
                 yAxis.scale(y)
                     .ticks(stacked.offset() == 'wiggle' ? 0 : nv.utils.calcTicksY(availableHeight/36, data) )
-                    .tickSize(-availableWidth, 0)
-                    .setTickFormat( (stacked.style() == 'expand' || stacked.style() == 'stack_percent')
-                        ? d3.format('%') : yAxisTickFormat);
+                    .tickSize(-availableWidth, 0);
+
+                    if (stacked.style() === 'expand' || stacked.style() === 'stack_percent') {
+                        oldYTickFormat = yAxis.tickFormat();
+                        //Forces the yAxis to use percentage in 'expand' mode.
+                        yAxis.tickFormat(d3.format('%'));
+                    }
+                    else {
+                        if (oldYTickFormat) yAxis.tickFormat(oldYTickFormat);
+                    }
 
                 g.select('.nv-y.nv-axis')
                     .transition().duration(0)
@@ -409,6 +401,10 @@ nv.models.stackedAreaChart = function() {
                 if (tooltips) showTooltip(e, that.parentNode);
             });
 
+            dispatch.on('tooltipHide', function() {
+                if (tooltips) nv.tooltip.cleanup();
+            });
+
             // Update chart from a state object passed to event handler
             dispatch.on('changeState', function(e) {
 
@@ -447,10 +443,6 @@ nv.models.stackedAreaChart = function() {
         dispatch.tooltipHide(e);
     });
 
-    dispatch.on('tooltipHide', function() {
-        if (tooltips) nv.tooltip.cleanup();
-    });
-
     //============================================================
     // Expose Public Variables
     //------------------------------------------------------------
@@ -463,8 +455,6 @@ nv.models.stackedAreaChart = function() {
     chart.xAxis = xAxis;
     chart.yAxis = yAxis;
     chart.interactiveLayer = interactiveLayer;
-
-    yAxis.setTickFormat = yAxis.tickFormat;
 
     chart.dispatch = dispatch;
     chart.options = nv.utils.optionsFunc.bind(chart);
@@ -482,7 +472,6 @@ nv.models.stackedAreaChart = function() {
         noData:    {get: function(){return noData;}, set: function(_){noData=_;}},
         showControls:    {get: function(){return showControls;}, set: function(_){showControls=_;}},
         controlLabels:    {get: function(){return controlLabels;}, set: function(_){controlLabels=_;}},
-        yAxisTickFormat:    {get: function(){return yAxisTickFormat;}, set: function(_){yAxisTickFormat=_;}},
 
         // options that require extra logic in the setter
         margin: {get: function(){return margin;}, set: function(_){

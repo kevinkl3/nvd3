@@ -26,7 +26,7 @@ nv.models.bulletChart = function() {
             return '<h3>' + x + '</h3>' +
                 '<p>' + y + '</p>'
         }
-        , noData = 'No Data Available.'
+        , noData = null
         , dispatch = d3.dispatch('tooltipShow', 'tooltipHide')
         ;
 
@@ -47,8 +47,7 @@ nv.models.bulletChart = function() {
             var container = d3.select(this);
             nv.utils.initSVG(container);
 
-            var availableWidth = (width  || parseInt(container.style('width')) || 960)
-                    - margin.left - margin.right,
+            var availableWidth = nv.utils.availableWidth(width, container, margin),
                 availableHeight = height - margin.top - margin.bottom,
                 that = this;
 
@@ -57,18 +56,7 @@ nv.models.bulletChart = function() {
 
             // Display No Data message if there's nothing to show.
             if (!d || !ranges.call(this, d, i)) {
-                var noDataText = container.selectAll('.nv-noData').data([noData]);
-
-                noDataText.enter().append('text')
-                    .attr('class', 'nvd3 nv-noData')
-                    .attr('dy', '-.7em')
-                    .style('text-anchor', 'middle');
-
-                noDataText
-                    .attr('x', margin.left + availableWidth / 2)
-                    .attr('y', 18 + margin.top + availableHeight / 2)
-                    .text(function(d) { return d });
-
+                nv.utils.noData(chart, container)
                 return chart;
             } else {
                 container.selectAll('.nv-noData').remove();
@@ -176,6 +164,9 @@ nv.models.bulletChart = function() {
                 if (tooltips) showTooltip(e, that.parentNode);
             });
 
+            dispatch.on('tooltipHide', function() {
+                if (tooltips) nv.tooltip.cleanup();
+            });
         });
 
         d3.timer.flush();
@@ -192,10 +183,6 @@ nv.models.bulletChart = function() {
 
     bullet.dispatch.on('elementMouseout.tooltip', function(e) {
         dispatch.tooltipHide(e);
-    });
-
-    dispatch.on('tooltipHide', function() {
-        if (tooltips) nv.tooltip.cleanup();
     });
 
     //============================================================

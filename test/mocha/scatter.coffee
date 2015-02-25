@@ -63,6 +63,7 @@ describe 'NVD3', ->
             builder.teardown()
 
         it 'api check', ->
+            should.exist builder.model.options, 'options exposed'
             for opt of options
                 should.exist builder.model[opt], "#{opt} exists"
                 should.exist builder.model[opt](), "#{opt} can be called"
@@ -70,6 +71,13 @@ describe 'NVD3', ->
         it 'renders', ->
             wrap = builder.$ 'g.nvd3.nv-scatterChart'
             should.exist wrap[0]
+
+        it 'clears chart objects for no data', ->
+            builder = new ChartBuilder nv.models.scatterChart()
+            builder.buildover options, sampleData1, []
+
+            groups = builder.$ 'g'
+            groups.length.should.equal 0, 'removes chart components'
 
         it 'has correct structure', ->
           cssClasses = [
@@ -152,3 +160,24 @@ describe 'NVD3', ->
 
             lines = builder.$ 'g.nvd3 .nv-regressionLinesWrap .nv-regLines'
             should.exist lines[0], 'regression lines exist'
+
+        it 'sets legend.width same as availableWidth', ->
+            builder.model.legend.width()
+            .should.equal builder.model.scatter.width()
+
+        it 'translates nv-wrap after legend height calculated', ->
+            builder.teardown()
+            sampleData4 = []
+            for i in [0..40]
+                sampleData4.push
+                    key: "Series #{i}"
+                    values: [
+                        [Math.random(),Math.random()]
+                    ]
+
+            builder.build options, sampleData4
+
+            transform = builder.$('.nv-wrap')[0].getAttribute('transform')
+            transform.should.equal 'translate(75,830)'
+
+

@@ -67,8 +67,9 @@ describe 'NVD3', ->
             builder1.teardown()
 
         it 'api check', ->
-            for opt of options
-                should.exist builder1.model[opt](), "#{opt} can be called"
+          should.exist builder1.model.options, 'options exposed'
+          for opt of options
+              should.exist builder1.model[opt](), "#{opt} can be called"
 
         it 'renders', ->
             wrap = builder1.$ 'g.nvd3.nv-cumulativeLine'
@@ -77,6 +78,13 @@ describe 'NVD3', ->
         it 'has the element with .nv-cumulativeLine class right positioned', ->
           cumulativeLine = builder1.$ 'g.nvd3.nv-cumulativeLine'
           cumulativeLine[0].getAttribute('transform').should.be.equal "translate(40,30)"
+
+        it 'clears chart objects for no data', ->
+            builder = new ChartBuilder nv.models.cumulativeLineChart()
+            builder.buildover options, sampleData1, []
+            
+            groups = builder.$ 'g'
+            groups.length.should.equal 0, 'removes chart components'
 
         it 'has correct structure', ->
           cssClasses = [
